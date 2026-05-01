@@ -1,0 +1,62 @@
+{
+  "app_users": {
+    "funnymail9999@gmail.com": {
+      "email": "funnymail9999@gmail.com",
+      "password": "$2b$10$R7rpkUxrNkMrXcjVFQM3RePfz99DO8kQzPQZN/Sa9XgqwkE4vB9wq",
+      "createdAt": "2026-05-01T20:55:28.293Z",
+      "mfaEnabled": false,
+      "pendingOTP": "332618",
+      "otpExpiry": 1777670019393
+    }
+  },
+  "transactions": [
+    {
+      "id": "test-123",
+      "userId": "funnymail9999@gmail.com",
+      "amount": 50,
+      "category": "Food",
+      "date": "2026-05-01",
+      "description": "Test Transaction",
+      "type": "expense",
+      "createdAt": "2026-05-01T20:55:28.293Z"
+    },
+    {
+      "id": "uj10gt7uc",
+      "userId": "funnymail9999@gmail.com",
+      "amount": 108,
+      "category": "Housing",
+      "date": "2026-05-02",
+      "description": "",
+      "type": "expense",
+      "createdAt": "2026-05-01T21:04:12.813Z"
+    },
+    {
+      "id": "hmc0iw8pa",
+      "userId": "funnymail9999@gmail.com",
+      "amount": 1000,
+      "category": "Housing",
+      "date": "2026-05-02",
+      "description": "",
+      "type": "income",
+      "createdAt": "2026-05-01T21:04:21.402Z"
+    },
+    {
+      "id": "1zk9kfz11",
+      "userId": "funnymail9999@gmail.com",
+      "amount": 200,
+      "category": "Housing",
+      "date": "2026-05-02",
+      "description": "Waste",
+      "type": "expense",
+      "createdAt": "2026-05-01T21:08:07.313Z"
+    }
+  ],
+  "budgets": [],
+  "users": {
+    "funnymail9999@gmail.com": {
+      "preferredCurrency": "INR",
+      "userId": "funnymail9999@gmail.com",
+      "updatedAt": "2026-05-01T21:05:05.103Z"
+    }
+  }
+}

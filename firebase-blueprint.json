@@ -1,0 +1,62 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User specific settings and metadata",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "preferredCurrency": { "type": "string", "enum": ["USD", "INR"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "username", "preferredCurrency", "displayName", "photoURL"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Financial transaction (income or expense)",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the owner" },
+        "amount": { "type": "number", "description": "Transaction amount" },
+        "category": { "type": "string", "description": "Category name or ID" },
+        "date": { "type": "string", "format": "date-time", "description": "Transaction date" },
+        "description": { "type": "string", "description": "Optional description" },
+        "type": { "type": "string", "enum": ["income", "expense"], "description": "Type of transaction" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp" }
+      },
+      "required": ["userId", "amount", "category", "date", "type"]
+    },
+    "Budget": {
+      "title": "Budget",
+      "description": "Spending limit for a specific category and period",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the owner" },
+        "categoryId": { "type": "string", "description": "Category ID" },
+        "amount": { "type": "number", "description": "Budgeted amount" },
+        "period": { "type": "string", "description": "Period identifier (e.g., YYYY-MM)" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "categoryId", "amount", "period"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile settings"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "User transactions"
+    },
+    "/budgets/{budgetId}": {
+      "schema": "Budget",
+      "description": "User budgets"
+    }
+  }
+}

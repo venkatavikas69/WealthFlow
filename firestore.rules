@@ -1,0 +1,104 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 0.1 Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // 0.2 User Profiles
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow create, update: if isOwner(userId) && isValidProfile(incoming());
+      
+      function isValidProfile(data) {
+        return data.keys().hasAll(['userId', 'username', 'preferredCurrency', 'displayName', 'photoURL', 'updatedAt'])
+          && data.userId == request.auth.uid
+          && data.username is string && data.username.size() >= 3 && data.username.size() <= 30
+          && data.displayName is string && data.displayName.size() <= 100
+          && data.photoURL is string && data.photoURL.size() <= 500
+          && data.preferredCurrency in ['USD', 'INR'];
+      }
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // 1. Transaction Hardening
+    match /transactions/{transactionId} {
+      allow get: if isOwner(existing().userId);
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      
+      allow create: if isSignedIn() 
+        && isValidTransaction(incoming())
+        && isOwner(incoming().userId);
+        
+      allow update: if isOwner(existing().userId)
+        && isValidTransaction(incoming())
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt;
+        
+      allow delete: if isOwner(existing().userId);
+
+      function isValidTransaction(data) {
+        return data.keys().hasAll(['userId', 'amount', 'category', 'date', 'type', 'createdAt'])
+          && data.keys().size() <= 8
+          && data.userId is string
+          && data.amount is number
+          && data.amount > 0
+          && data.category is string && data.category.size() <= 50
+          && data.date is string
+          && data.type in ['income', 'expense']
+          // Identity Integrity
+          && data.userId == request.auth.uid;
+      }
+    }
+
+    // 2. Budget Hardening
+    match /budgets/{budgetId} {
+      allow get: if isOwner(existing().userId);
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      allow create: if isSignedIn()
+        && isValidBudget(incoming())
+        && isOwner(incoming().userId);
+
+      allow update: if isOwner(existing().userId)
+        && isValidBudget(incoming())
+        && incoming().userId == existing().userId
+        && incoming().categoryId == existing().categoryId;
+
+      allow delete: if isOwner(existing().userId);
+
+      function isValidBudget(data) {
+        return data.keys().hasAll(['userId', 'categoryId', 'amount', 'period', 'createdAt'])
+          && data.userId is string
+          && data.categoryId is string && data.categoryId.size() <= 50
+          && data.amount is number
+          && data.amount >= 0
+          && data.period is string && data.period.size() <= 10
+          // Identity Integrity
+          && data.userId == request.auth.uid;
+      }
+    }
+  }
+}
