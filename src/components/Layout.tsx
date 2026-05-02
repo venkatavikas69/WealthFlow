@@ -17,7 +17,7 @@ export default function Layout({ children, activeTab, setActiveTab, onAddClick, 
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
-  const tabs = [
+  const tabs: { id: string; label: string; icon: any; premium?: boolean }[] = [
     { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
     { id: 'transactions', label: 'Wallet', icon: Wallet },
     { id: 'assistant', label: 'Assistant', icon: Sparkles, premium: true },
