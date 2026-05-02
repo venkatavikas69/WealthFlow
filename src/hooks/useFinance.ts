@@ -1,6 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Transaction, Budget, UserProfile } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { db } from '../lib/firebase';
+import { 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  addDoc, 
+  deleteDoc, 
+  doc, 
+  setDoc,
+  orderBy,
+  onSnapshot
+} from 'firebase/firestore';
 
 export function useFinance() {
   const { user } = useAuth();
@@ -10,87 +23,101 @@ export function useFinance() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const [tRes, bRes, pRes] = await Promise.all([
-        fetch('/api/transactions', { credentials: 'include' }),
-        fetch('/api/budgets', { credentials: 'include' }),
-        fetch('/api/profile', { credentials: 'include' })
-      ]);
-
-      if (tRes.ok) setTransactions(await tRes.json());
-      if (bRes.ok) setBudgets(await bRes.json());
-      if (pRes.ok) setUserProfile(await pRes.json());
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
+  useEffect(() => {
+    if (!user) {
+      setTransactions([]);
+      setBudgets([]);
+      setUserProfile(null);
       setLoading(false);
+      return;
     }
+
+    setLoading(true);
+
+    // 1. Transactions Listener
+    const qTransactions = query(
+      collection(db, 'transactions'),
+      where('userId', '==', user.email),
+      orderBy('date', 'desc')
+    );
+    const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
+      setTransactions(docs);
+      setLoading(false);
+    }, (err) => {
+      console.error("Transactions error:", err);
+      setError(err.message);
+    });
+
+    // 2. Budgets Listener
+    const qBudgets = query(
+      collection(db, 'budgets'),
+      where('userId', '==', user.email)
+    );
+    const unsubBudgets = onSnapshot(qBudgets, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Budget));
+      setBudgets(docs);
+    });
+
+    // 3. Profile Listener
+    // Use doc reference for profile, assuming userId as doc key
+    const docRef = doc(db, 'profiles', user.email);
+    const unsubProfile = onSnapshot(docRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setUserProfile({ ...docSnap.data(), uid: docSnap.id } as UserProfile);
+      } else {
+        // Create default profile if missing
+        const defaultProfile: UserProfile = {
+          uid: user.email,
+          username: user.email.split('@')[0],
+          displayName: user.email.split('@')[0],
+          photoURL: '',
+          preferredCurrency: 'USD'
+        };
+        setUserProfile(defaultProfile);
+      }
+    });
+
+    return () => {
+      unsubTransactions();
+      unsubBudgets();
+      unsubProfile();
+    };
   }, [user]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
   const updateUserProfile = async (data: Partial<UserProfile>) => {
+    if (!user) return;
     try {
-      const res = await fetch('/api/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-        credentials: 'include'
-      });
-      if (res.ok) {
-        await fetchData();
-      } else {
-        const errorData = await res.json();
-        console.error("Update profile failed:", errorData.error);
-        alert(`Failed to update profile: ${errorData.error}`);
-        throw new Error(errorData.error);
-      }
+      const docRef = doc(db, 'profiles', user.email);
+      await setDoc(docRef, { 
+        ...data, 
+        userId: user.email,
+        updatedAt: new Date().toISOString() 
+      }, { merge: true });
     } catch (err: any) {
       console.error("Update profile failed:", err);
-      alert("Update profile failed due to a network error.");
       throw err;
     }
   };
 
   const addTransaction = async (data: Omit<Transaction, 'id' | 'userId' | 'createdAt'>) => {
+    if (!user) return;
     try {
-      const res = await fetch('/api/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-        credentials: 'include'
+      const colRef = collection(db, 'transactions');
+      await addDoc(colRef, {
+        ...data,
+        userId: user.email,
+        createdAt: new Date().toISOString()
       });
-      if (res.ok) {
-        await fetchData();
-      } else {
-        const errorData = await res.json();
-        console.error("Add transaction failed:", errorData.error);
-        alert(`Failed to add transaction: ${errorData.error}`);
-        throw new Error(errorData.error);
-      }
     } catch (err: any) {
       console.error("Add transaction failed:", err);
-      alert("Add transaction failed due to a network error.");
       throw err;
     }
   };
 
   const deleteTransaction = async (id: string) => {
     try {
-      const res = await fetch(`/api/transactions/${id}`, { 
-        method: 'DELETE',
-        credentials: 'include'
-      });
-      if (res.ok) {
-        await fetchData();
-      } else {
-        throw new Error("Failed to delete");
-      }
+      await deleteDoc(doc(db, 'transactions', id));
     } catch (err: any) {
       console.error("Delete transaction failed:", err);
       throw err;
@@ -98,14 +125,17 @@ export function useFinance() {
   };
 
   const addOrUpdateBudget = async (categoryId: string, amount: number, period: string) => {
+    if (!user) return;
     try {
-      const res = await fetch('/api/budgets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ categoryId, amount, period }),
-        credentials: 'include'
+      const budgetId = `${user.email}_${categoryId}_${period}`;
+      const docRef = doc(db, 'budgets', budgetId);
+      await setDoc(docRef, {
+        userId: user.email,
+        categoryId,
+        amount,
+        period,
+        createdAt: new Date().toISOString()
       });
-      if (res.ok) await fetchData();
     } catch (err: any) {
       console.error("Update budget failed:", err);
     }
@@ -121,6 +151,6 @@ export function useFinance() {
     deleteTransaction,
     addOrUpdateBudget,
     updateUserProfile,
-    refresh: fetchData
+    refresh: () => {} // Refresh is automatic with onSnapshot
   };
 }

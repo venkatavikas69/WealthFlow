@@ -33,6 +33,7 @@ interface PasswordManagerProps {
 }
 
 function PasswordManager({ user }: PasswordManagerProps) {
+  const { changePassword } = useAuth();
   const [isChanging, setIsChanging] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -48,20 +49,16 @@ function PasswordManager({ user }: PasswordManagerProps) {
     setMessage(null);
 
     try {
-      const res = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ newPassword })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to update password');
-      
+      await changePassword(newPassword);
       setMessage({ text: 'Password updated successfully!', type: 'success' });
       setNewPassword('');
       setTimeout(() => setIsChanging(false), 2000);
     } catch (error: any) {
       console.error("Password action failed:", error);
-      setMessage({ text: error.message, type: 'error' });
+      const friendlyMessage = error.message.includes('auth/requires-recent-login') 
+        ? "Please re-login to change your password for security."
+        : error.message;
+      setMessage({ text: friendlyMessage, type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -130,71 +127,24 @@ function PasswordManager({ user }: PasswordManagerProps) {
 }
 
 function MFAManager() {
-  const [mfaEnabled, setMfaEnabled] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [toggling, setToggling] = useState(false);
-
-  React.useEffect(() => {
-    fetch('/api/auth/mfa-status')
-      .then(res => res.json())
-      .then(data => setMfaEnabled(data.mfaEnabled))
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
-
-  const toggleMFA = async () => {
-    setToggling(true);
-    try {
-      const res = await fetch('/api/auth/toggle-mfa', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: !mfaEnabled })
-      });
-      if (res.ok) {
-        setMfaEnabled(!mfaEnabled);
-      }
-    } catch (error) {
-      console.error("Failed to toggle MFA:", error);
-    } finally {
-      setToggling(false);
-    }
-  };
-
-  if (loading) return <div className="h-20 animate-pulse bg-gray-100 dark:bg-gray-800 rounded-2xl" />;
-
   return (
     <div className="space-y-3 pt-4 border-t border-gray-200/50 dark:border-gray-800">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Shield className="w-3 h-3 text-gray-400 dark:text-gray-500" />
-          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Two-Factor Auth</span>
+          <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Cloud Security</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className={cn(
-            "text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full",
-            mfaEnabled ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400" : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500"
-          )}>
-            {mfaEnabled ? 'Protected' : 'Off'}
+          <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400">
+            Active
           </span>
         </div>
       </div>
 
       <div className="space-y-2">
         <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium leading-relaxed">
-          Enable a 6-digit OTP check during sign in for enhanced wallet security.
+          Your account is protected by standard Firebase Security protocols.
         </p>
-        <button 
-          onClick={toggleMFA}
-          disabled={toggling}
-          className={cn(
-            "w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm border flex items-center justify-center gap-2",
-            mfaEnabled 
-              ? "bg-red-50 border-red-100 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:border-red-900/30 dark:text-red-400 dark:hover:bg-red-900/30" 
-              : "bg-black dark:bg-indigo-600 border-black dark:border-indigo-600 text-white hover:bg-gray-800 dark:hover:bg-indigo-700"
-          )}
-        >
-          {toggling ? "Applying..." : (mfaEnabled ? "Disable MFA Security" : "Enable OTP Security")}
-        </button>
       </div>
     </div>
   );

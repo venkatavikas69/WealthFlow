@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { User } from 'firebase/auth';
-import { auth, signInWithGoogle, logout } from '../lib/firebase';
 import { LogOut, LogIn, PieChart, Wallet, CreditCard, LayoutDashboard, User as UserIcon, Sun, Moon, Sparkles, Plus } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -15,12 +14,8 @@ interface LayoutProps {
 }
 
 export default function Layout({ children, activeTab, setActiveTab, onAddClick, isLoading }: LayoutProps) {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-
-  useEffect(() => {
-    return auth.onAuthStateChanged((u) => setUser(u));
-  }, []);
 
   const tabs = [
     { id: 'dashboard', label: 'Home', icon: LayoutDashboard },

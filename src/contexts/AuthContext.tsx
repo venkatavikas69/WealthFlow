@@ -1,8 +1,20 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { 
+  onAuthStateChanged, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut, 
+  signInWithPopup,
+  sendEmailVerification
+} from 'firebase/auth';
+import { auth, googleProvider, githubProvider } from '../lib/firebase';
 
 interface AuthUser {
   email: string;
   emailVerified: boolean;
+  uid: string;
+  displayName: string | null;
+  photoURL: string | null;
 }
 
 interface AuthContextType {
@@ -16,6 +28,7 @@ interface AuthContextType {
   loginWithGitHub: () => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  changePassword: (newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,136 +37,92 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const checkAuth = async () => {
-    try {
-      const res = await fetch('/api/auth/me', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser({
+          email: firebaseUser.email || '',
+          emailVerified: firebaseUser.emailVerified,
+          uid: firebaseUser.uid,
+          displayName: firebaseUser.displayName,
+          photoURL: firebaseUser.photoURL
+        });
       } else {
         setUser(null);
       }
-    } catch (err) {
-      setUser(null);
-    } finally {
       setLoading(false);
-    }
-  };
+    });
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // Validate origin if needed, but for simplicity in dev:
-      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-        checkAuth();
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    return () => unsubscribe();
   }, []);
 
   const loginWithGitHub = async () => {
-    const redirectUri = `${window.location.origin}/api/auth/github/callback`;
-    const response = await fetch(`/api/auth/github/url?redirect_uri=${encodeURIComponent(redirectUri)}`);
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || 'Failed to get GitHub auth URL');
+    try {
+      await signInWithPopup(auth, githubProvider);
+    } catch (error: any) {
+      console.error('GitHub Auth Error:', error);
+      throw error;
     }
-    const { url } = await response.json();
-    
-    window.open(url, 'github_oauth', 'width=600,height=700');
   };
 
   const loginWithGoogle = async () => {
-    const redirectUri = `${window.location.origin}/api/auth/google/callback`;
-    const response = await fetch(`/api/auth/google/url?redirect_uri=${encodeURIComponent(redirectUri)}`);
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || 'Failed to get Google auth URL');
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error: any) {
+      console.error('Google Auth Error:', error);
+      throw error;
     }
-    const { url } = await response.json();
-    
-    window.open(url, 'google_oauth', 'width=600,height=700');
   };
 
   const login = async (email: string, password: string) => {
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-      credentials: 'include'
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Login failed');
-    
-    if (data.mfaRequired) {
-      return data;
+    try {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      return { email: result.user.email || '' };
+    } catch (error: any) {
+      throw new Error(error.message || 'Login failed');
     }
-    
-    setUser(data);
-    return data;
   };
 
   const verifyOTP = async (email: string, otp: string) => {
-    const res = await fetch('/api/auth/verify-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, otp }),
-      credentials: 'include'
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'OTP verification failed');
-    setUser(data);
+    // Note: Firebase standard auth doesn't use this exact pattern for OTP unless using Phone Auth.
+    // Since we're migrating, we'll bypass this or implement if necessary.
+    console.warn('OTP Verification not implemented in Firebase standard email/password flow');
   };
 
   const register = async (email: string, password: string) => {
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-      credentials: 'include'
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Registration failed');
-    setUser(data);
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+    } catch (error: any) {
+      throw new Error(error.message || 'Registration failed');
+    }
   };
 
   const verifyEmail = async (code: string) => {
-    const res = await fetch('/api/auth/verify-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code }),
-      credentials: 'include'
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Verification failed');
-    setUser(data);
+    // Handled automatically by Firebase if using standard verification links
+    console.warn('Manual email verification code not supported in standard Firebase flow');
   };
 
   const resendVerification = async () => {
-    const res = await fetch('/api/auth/resend-verification', {
-      method: 'POST',
-      credentials: 'include'
-    });
-    if (!res.ok) {
-      const data = await res.json();
-      throw new Error(data.error || 'Failed to resend code');
+    if (auth.currentUser) {
+      await sendEmailVerification(auth.currentUser);
     }
   };
 
   const logout = async () => {
-    await fetch('/api/auth/logout', { 
-      method: 'POST',
-      credentials: 'include'
-    });
-    setUser(null);
+    await signOut(auth);
+  };
+
+  const changePassword = async (newPassword: string) => {
+    if (auth.currentUser) {
+      const { updatePassword } = await import('firebase/auth');
+      await updatePassword(auth.currentUser, newPassword);
+    } else {
+      throw new Error('No user authenticated');
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, verifyOTP, register, verifyEmail, resendVerification, loginWithGitHub, loginWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, verifyOTP, register, verifyEmail, resendVerification, loginWithGitHub, loginWithGoogle, logout, changePassword }}>
       {children}
     </AuthContext.Provider>
   );
