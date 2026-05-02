@@ -119,6 +119,6 @@ export function useFinance() {
     deleteTransaction,
     addOrUpdateBudget,
     updateUserProfile,
-    refresh: () => {} // Refresh is automatic with onSnapshot
+    refresh: () => {} // Local storage is already in sync
   };
 }

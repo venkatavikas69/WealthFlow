@@ -18,16 +18,18 @@ export default function TransactionList({ transactions, onDelete, onAdd, currenc
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDelete = async (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setDeletingId(id);
     try {
       await onDelete(id);
       if (selectedTransaction?.id === id) {
         setSelectedTransaction(null);
       }
+      setShowDeleteConfirm(null);
     } catch (error) {
       console.error("Delete failed:", error);
     } finally {
@@ -371,27 +373,47 @@ export default function TransactionList({ transactions, onDelete, onAdd, currenc
 
               {/* Sticky Footer for Buttons */}
               <div className="p-6 sm:p-10 pt-6 sm:pt-8 bg-white dark:bg-[#0f172a] border-t border-gray-50 dark:border-gray-800 flex gap-3 sm:gap-4 mt-auto">
-                 <button
-                  onClick={() => setSelectedTransaction(null)}
-                  className="flex-1 py-3.5 sm:py-4 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-widest hover:bg-gray-200 dark:hover:bg-gray-700 transition-all active:scale-95 flex items-center justify-center gap-2"
-                >
-                  <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  Close
-                </button>
-                <button
-                  onClick={(e) => handleDelete(selectedTransaction.id, e as any)}
-                  disabled={deletingId === selectedTransaction.id}
-                  className="flex-1 py-3.5 sm:py-4 bg-red-50 dark:bg-red-500/10 text-red-500 rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-widest hover:bg-red-100 dark:hover:bg-red-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {deletingId === selectedTransaction.id ? (
-                    <div className="w-4 h-4 border-2 border-red-200 border-t-red-500 rounded-full animate-spin" />
-                  ) : (
-                    <>
+                {showDeleteConfirm === selectedTransaction.id ? (
+                  <>
+                    <button
+                      onClick={() => setShowDeleteConfirm(null)}
+                      className="flex-1 py-3.5 sm:py-4 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-widest hover:bg-gray-200 dark:hover:bg-gray-700 transition-all active:scale-95"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleDelete(selectedTransaction.id)}
+                      disabled={deletingId === selectedTransaction.id}
+                      className="flex-1 py-3.5 sm:py-4 bg-red-600 text-white rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {deletingId === selectedTransaction.id ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          Confirm Delete
+                        </>
+                      )}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setSelectedTransaction(null)}
+                      className="flex-1 py-3.5 sm:py-4 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-widest hover:bg-gray-200 dark:hover:bg-gray-700 transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
+                      <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      Close
+                    </button>
+                    <button
+                      onClick={() => setShowDeleteConfirm(selectedTransaction.id)}
+                      className="flex-1 py-3.5 sm:py-4 bg-red-50 dark:bg-red-500/10 text-red-500 rounded-xl sm:rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-widest hover:bg-red-100 dark:hover:bg-red-500/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                    >
                       <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       Delete
-                    </>
-                  )}
-                </button>
+                    </button>
+                  </>
+                )}
               </div>
             </motion.div>
           </div>

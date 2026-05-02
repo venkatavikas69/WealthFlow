@@ -1,8 +1,16 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ 
-  apiKey: process.env.GEMINI_API_KEY 
-});
+let genAI: GoogleGenAI | null = null;
+
+function getAI() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+  
+  if (!genAI) {
+    genAI = new GoogleGenAI(apiKey);
+  }
+  return genAI;
+}
 
 interface FinancialContext {
   transactions: any[];
@@ -11,9 +19,9 @@ interface FinancialContext {
 }
 
 export async function askAI(prompt: string, context: FinancialContext) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured in the environment.");
+  const ai = getAI();
+  if (!ai) {
+    return "I'm sorry, but the AI Assistant is not configured on this deployment. Please provide a GEMINI_API_KEY to enable this feature.";
   }
   
   const { transactions, budgets, userProfile } = context;

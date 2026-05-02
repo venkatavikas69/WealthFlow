@@ -29,11 +29,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulated auth check using localStorage
-    const savedUser = localStorage.getItem('guest_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    } else {
+    try {
+      // Simulated auth check using localStorage
+      const savedUser = localStorage.getItem('guest_user');
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      } else {
+        const guest = {
+          email: 'guest@example.com',
+          emailVerified: true,
+          uid: 'guest_user_123',
+          displayName: 'Guest User',
+          photoURL: null
+        };
+        localStorage.setItem('guest_user', JSON.stringify(guest));
+        setUser(guest);
+      }
+    } catch (error) {
+      console.error("Auth initialization error:", error);
+      // Fallback guest user
       const guest = {
         email: 'guest@example.com',
         emailVerified: true,
@@ -41,10 +55,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         displayName: 'Guest User',
         photoURL: null
       };
-      localStorage.setItem('guest_user', JSON.stringify(guest));
       setUser(guest);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const loginWithGitHub = async () => {
