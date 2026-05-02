@@ -1,19 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Transaction, Budget, UserProfile } from '../types';
 import { useAuth } from '../contexts/AuthContext';
-import { db } from '../lib/firebase';
-import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  addDoc, 
-  deleteDoc, 
-  doc, 
-  setDoc,
-  orderBy,
-  onSnapshot
-} from 'firebase/firestore';
 
 export function useFinance() {
   const { user } = useAuth();
@@ -34,111 +21,92 @@ export function useFinance() {
 
     setLoading(true);
 
-    // 1. Transactions Listener
-    const qTransactions = query(
-      collection(db, 'transactions'),
-      where('userId', '==', user.email),
-      orderBy('date', 'desc')
-    );
-    const unsubTransactions = onSnapshot(qTransactions, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Transaction));
-      setTransactions(docs);
-      setLoading(false);
-    }, (err) => {
-      console.error("Transactions error:", err);
-      setError(err.message);
-    });
-
-    // 2. Budgets Listener
-    const qBudgets = query(
-      collection(db, 'budgets'),
-      where('userId', '==', user.email)
-    );
-    const unsubBudgets = onSnapshot(qBudgets, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Budget));
-      setBudgets(docs);
-    });
-
-    // 3. Profile Listener
-    // Use doc reference for profile, assuming userId as doc key
-    const docRef = doc(db, 'profiles', user.email);
-    const unsubProfile = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setUserProfile({ ...docSnap.data(), uid: docSnap.id } as UserProfile);
+    try {
+      // Load Transactions
+      const savedTransactions = localStorage.getItem(`transactions_${user.uid}`);
+      if (savedTransactions) {
+        setTransactions(JSON.parse(savedTransactions));
       } else {
-        // Create default profile if missing
+        setTransactions([]);
+      }
+
+      // Load Budgets
+      const savedBudgets = localStorage.getItem(`budgets_${user.uid}`);
+      if (savedBudgets) {
+        setBudgets(JSON.parse(savedBudgets));
+      } else {
+        setBudgets([]);
+      }
+
+      // Load Profile
+      const savedProfile = localStorage.getItem(`profile_${user.uid}`);
+      if (savedProfile) {
+        setUserProfile(JSON.parse(savedProfile));
+      } else {
         const defaultProfile: UserProfile = {
-          uid: user.email,
+          uid: user.uid,
           username: user.email.split('@')[0],
           displayName: user.email.split('@')[0],
           photoURL: '',
           preferredCurrency: 'USD'
         };
         setUserProfile(defaultProfile);
+        localStorage.setItem(`profile_${user.uid}`, JSON.stringify(defaultProfile));
       }
-    });
-
-    return () => {
-      unsubTransactions();
-      unsubBudgets();
-      unsubProfile();
-    };
+    } catch (err) {
+      console.error("Error loading data from local storage:", err);
+      setError("Failed to load local data");
+    } finally {
+      setLoading(false);
+    }
   }, [user]);
 
   const updateUserProfile = async (data: Partial<UserProfile>) => {
-    if (!user) return;
-    try {
-      const docRef = doc(db, 'profiles', user.email);
-      await setDoc(docRef, { 
-        ...data, 
-        userId: user.email,
-        updatedAt: new Date().toISOString() 
-      }, { merge: true });
-    } catch (err: any) {
-      console.error("Update profile failed:", err);
-      throw err;
-    }
+    if (!user || !userProfile) return;
+    const updated = { ...userProfile, ...data };
+    setUserProfile(updated);
+    localStorage.setItem(`profile_${user.uid}`, JSON.stringify(updated));
   };
 
   const addTransaction = async (data: Omit<Transaction, 'id' | 'userId' | 'createdAt'>) => {
     if (!user) return;
-    try {
-      const colRef = collection(db, 'transactions');
-      await addDoc(colRef, {
-        ...data,
-        userId: user.email,
-        createdAt: new Date().toISOString()
-      });
-    } catch (err: any) {
-      console.error("Add transaction failed:", err);
-      throw err;
-    }
+    const newTransaction: Transaction = {
+      ...data,
+      id: Math.random().toString(36).substr(2, 9),
+      userId: user.uid,
+      createdAt: new Date().toISOString()
+    };
+    const updated = [newTransaction, ...transactions];
+    setTransactions(updated);
+    localStorage.setItem(`transactions_${user.uid}`, JSON.stringify(updated));
   };
 
   const deleteTransaction = async (id: string) => {
-    try {
-      await deleteDoc(doc(db, 'transactions', id));
-    } catch (err: any) {
-      console.error("Delete transaction failed:", err);
-      throw err;
-    }
+    if (!user) return;
+    const updated = transactions.filter(t => t.id !== id);
+    setTransactions(updated);
+    localStorage.setItem(`transactions_${user.uid}`, JSON.stringify(updated));
   };
 
   const addOrUpdateBudget = async (categoryId: string, amount: number, period: string) => {
     if (!user) return;
-    try {
-      const budgetId = `${user.email}_${categoryId}_${period}`;
-      const docRef = doc(db, 'budgets', budgetId);
-      await setDoc(docRef, {
-        userId: user.email,
+    const existingIndex = budgets.findIndex(b => b.categoryId === categoryId && b.period === period);
+    let updated;
+    if (existingIndex > -1) {
+      updated = [...budgets];
+      updated[existingIndex] = { ...updated[existingIndex], amount };
+    } else {
+      updated = [...budgets, {
+        id: Math.random().toString(36).substr(2, 9),
+        userId: user.uid,
         categoryId,
         amount,
         period,
         createdAt: new Date().toISOString()
-      });
-    } catch (err: any) {
-      console.error("Update budget failed:", err);
+      }];
     }
+    setBudgets(updated);
+    localStorage.setItem(`budgets_${user.uid}`, JSON.stringify(updated));
   };
 
   return {

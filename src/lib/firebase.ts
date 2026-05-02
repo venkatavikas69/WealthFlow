@@ -1,11 +1,7 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, GithubAuthProvider } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
+// Firebase is disabled for this static deployment to avoid API key requirements on Netlify.
+// Data is stored in the browser's localStorage instead.
 
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-
-export const googleProvider = new GoogleAuthProvider();
-export const githubProvider = new GithubAuthProvider();
+export const auth = {} as any;
+export const db = {} as any;
+export const googleProvider = {} as any;
+export const githubProvider = {} as any;

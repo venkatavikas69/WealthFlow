@@ -1,13 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  onAuthStateChanged, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signOut, 
-  signInWithPopup,
-  sendEmailVerification
-} from 'firebase/auth';
-import { auth, googleProvider, githubProvider } from '../lib/firebase';
 
 interface AuthUser {
   email: string;
@@ -38,87 +29,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        setUser({
-          email: firebaseUser.email || '',
-          emailVerified: firebaseUser.emailVerified,
-          uid: firebaseUser.uid,
-          displayName: firebaseUser.displayName,
-          photoURL: firebaseUser.photoURL
-        });
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    // Simulated auth check using localStorage
+    const savedUser = localStorage.getItem('guest_user');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+    } else {
+      const guest = {
+        email: 'guest@example.com',
+        emailVerified: true,
+        uid: 'guest_user_123',
+        displayName: 'Guest User',
+        photoURL: null
+      };
+      localStorage.setItem('guest_user', JSON.stringify(guest));
+      setUser(guest);
+    }
+    setLoading(false);
   }, []);
 
   const loginWithGitHub = async () => {
-    try {
-      await signInWithPopup(auth, githubProvider);
-    } catch (error: any) {
-      console.error('GitHub Auth Error:', error);
-      throw error;
-    }
+    console.warn('Real Auth disabled for static build');
   };
 
   const loginWithGoogle = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error: any) {
-      console.error('Google Auth Error:', error);
-      throw error;
-    }
+    console.warn('Real Auth disabled for static build');
   };
 
   const login = async (email: string, password: string) => {
-    try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      return { email: result.user.email || '' };
-    } catch (error: any) {
-      throw new Error(error.message || 'Login failed');
-    }
+    const guest = {
+      email,
+      emailVerified: true,
+      uid: 'guest_user_123',
+      displayName: email.split('@')[0],
+      photoURL: null
+    };
+    localStorage.setItem('guest_user', JSON.stringify(guest));
+    setUser(guest);
+    return { email };
   };
 
   const verifyOTP = async (email: string, otp: string) => {
-    // Note: Firebase standard auth doesn't use this exact pattern for OTP unless using Phone Auth.
-    // Since we're migrating, we'll bypass this or implement if necessary.
-    console.warn('OTP Verification not implemented in Firebase standard email/password flow');
+    console.warn('OTP not available in static mode');
   };
 
   const register = async (email: string, password: string) => {
-    try {
-      await createUserWithEmailAndPassword(auth, email, password);
-    } catch (error: any) {
-      throw new Error(error.message || 'Registration failed');
-    }
+    await login(email, password);
   };
 
   const verifyEmail = async (code: string) => {
-    // Handled automatically by Firebase if using standard verification links
-    console.warn('Manual email verification code not supported in standard Firebase flow');
+    console.warn('Verification not needed');
   };
 
   const resendVerification = async () => {
-    if (auth.currentUser) {
-      await sendEmailVerification(auth.currentUser);
-    }
+    console.warn('Resend disabled');
   };
 
   const logout = async () => {
-    await signOut(auth);
+    localStorage.removeItem('guest_user');
+    setUser(null);
   };
 
   const changePassword = async (newPassword: string) => {
-    if (auth.currentUser) {
-      const { updatePassword } = await import('firebase/auth');
-      await updatePassword(auth.currentUser, newPassword);
-    } else {
-      throw new Error('No user authenticated');
-    }
+    console.warn('Password change not available in static mode');
   };
 
   return (
